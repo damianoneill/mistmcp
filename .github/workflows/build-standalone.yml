@@ -123,7 +123,7 @@ jobs:
       if: matrix.platform == 'windows'
       shell: cmd
       run: |
-        timeout 10 "evaluation-package\\${{ steps.exe_name.outputs.exe_name }}" --help || echo "Test completed"
+        "evaluation-package\${{ steps.exe_name.outputs.exe_name }}" --help || echo "Test completed"
 
     - name: Create platform-specific package
       shell: bash
