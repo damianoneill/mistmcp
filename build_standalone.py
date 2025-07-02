@@ -36,19 +36,29 @@ TOOLS_JSON_PATH = SRC_DIR / "mistmcp" / "tools.json"
 sys.path.insert(0, str(SRC_DIR))
 
 
+def safe_print(message, file=None):
+    """Print message with Windows-compatible encoding handling"""
+    try:
+        print(message, file=file)
+    except UnicodeEncodeError:
+        # Fallback to ASCII-safe version
+        ascii_message = message.encode("ascii", "replace").decode("ascii")
+        print(ascii_message, file=file)
+
+
 def print_banner() -> None:
-    """Print build banner"""
-    print("🚀 Mist MCP Standalone Builder")
-    print("=" * 50)
-    print(f"📁 Project: {PROJECT_ROOT}")
-    print(f"🖥️  Platform: {platform.system()} {platform.machine()}")
-    print(f"🐍 Python: {sys.version.split()[0]}")
-    print()
+    """Print build banner with Windows-compatible characters"""
+    safe_print("*** Mist MCP Standalone Builder ***")
+    safe_print("=" * 50)
+    safe_print(f"Project: {PROJECT_ROOT}")
+    safe_print(f"Platform: {platform.system()} {platform.machine()}")
+    safe_print(f"Python: {sys.version.split()[0]}")
+    safe_print("")
 
 
 def check_prerequisites() -> bool:
     """Check that required tools are available"""
-    print("🔍 Checking prerequisites...")
+    safe_print("Checking prerequisites...")
 
     # Check if we're in a virtual environment with PyInstaller
     try:
@@ -58,19 +68,19 @@ def check_prerequisites() -> bool:
             text=True,
             check=True,
         )  # nosec B603
-        print(f"✅ PyInstaller: {result.stdout.strip()}")
+        safe_print(f"[OK] PyInstaller: {result.stdout.strip()}")
     except (subprocess.CalledProcessError, FileNotFoundError):
-        print("❌ PyInstaller not found!")
-        print("Install with: uv add --dev pyinstaller")
+        safe_print("[ERROR] PyInstaller not found!")
+        safe_print("Install with: uv add --dev pyinstaller")
         return False
 
     # Check if we can import mistmcp
     import importlib.util
 
     if importlib.util.find_spec("mistmcp") is not None:
-        print("✅ mistmcp importable")
+        safe_print("[OK] mistmcp importable")
     else:
-        print("❌ Cannot import mistmcp: module not found")
+        safe_print("[ERROR] Cannot import mistmcp: module not found")
         return False
 
     return True
@@ -79,25 +89,25 @@ def check_prerequisites() -> bool:
 def create_tools_json_if_needed() -> bool:
     """Create tools.json only if it doesn't exist"""
     if TOOLS_JSON_PATH.exists():
-        print(f"✅ Found existing {TOOLS_JSON_PATH}")
+        safe_print(f"[OK] Found existing {TOOLS_JSON_PATH}")
         return True
 
     try:
-        print("📄 Creating tools.json for PyInstaller...")
+        safe_print("Creating tools.json for PyInstaller...")
         from mistmcp.tool_helper import TOOLS
 
         with open(TOOLS_JSON_PATH, "w", encoding="utf-8") as f:
             json.dump(TOOLS, f, indent=2)
 
-        print(f"✅ Created {TOOLS_JSON_PATH}")
-        print(f"📊 Contains {len(TOOLS)} tool categories")
+        safe_print(f"[OK] Created {TOOLS_JSON_PATH}")
+        safe_print(f"Contains {len(TOOLS)} tool categories")
         return True
 
     except ImportError as e:
-        print(f"❌ Could not import TOOLS from tool_helper: {e}")
+        safe_print(f"[ERROR] Could not import TOOLS from tool_helper: {e}")
         return False
     except Exception as e:
-        print(f"❌ Error creating tools.json: {e}")
+        safe_print(f"[ERROR] Error creating tools.json: {e}")
         return False
 
 
@@ -180,7 +190,6 @@ def get_platform_specific_config():
                 "--icon=NONE",  # Avoid icon issues
             ]
         )
-        # Note: win32api imports are optional and may not be needed
 
     elif system == "darwin":
         config["additional_args"].extend(
@@ -205,7 +214,7 @@ def discover_tool_modules():
     tools_dir = SRC_DIR / "mistmcp" / "tools"
 
     if not tools_dir.exists():
-        print(f"⚠️ Tools directory not found: {tools_dir}")
+        safe_print(f"[WARNING] Tools directory not found: {tools_dir}")
         return modules
 
     for category_dir in tools_dir.iterdir():
@@ -220,13 +229,13 @@ def discover_tool_modules():
                         f"mistmcp.tools.{category_dir.name}.{tool_file.stem}"
                     )
 
-    print(f"📦 Discovered {len(modules)} tool modules")
+    safe_print(f"Discovered {len(modules)} tool modules")
     return modules
 
 
 def test_executable(exe_path) -> bool:
     """Test the built executable"""
-    print("🧪 Testing executable...")
+    safe_print("Testing executable...")
 
     try:
         # Test help command
@@ -235,31 +244,31 @@ def test_executable(exe_path) -> bool:
         )  # nosec B603
 
         if result.returncode == 0:
-            print("✅ Help test passed")
+            safe_print("[OK] Help test passed")
             return True
         else:
-            print(f"⚠️ Help test failed (exit code: {result.returncode})")
+            safe_print(f"[WARNING] Help test failed (exit code: {result.returncode})")
             if result.stderr:
-                print(f"Error: {result.stderr[:200]}...")
+                safe_print(f"Error: {result.stderr[:200]}...")
             return False
 
     except subprocess.TimeoutExpired:
-        print("⚠️ Executable test timed out")
+        safe_print("[WARNING] Executable test timed out")
         return False
     except Exception as e:
-        print(f"⚠️ Executable test failed: {e}")
+        safe_print(f"[WARNING] Executable test failed: {e}")
         return False
 
 
 def build_executable():
     """Build the standalone executable using PyInstaller with platform-specific optimizations"""
-    print("🔨 Building standalone executable...")
+    safe_print("Building standalone executable...")
 
     exe_name = get_executable_name()
     main_file = SRC_DIR / "mistmcp" / "__main__.py"
 
     if not main_file.exists():
-        print(f"❌ Main file not found: {main_file}")
+        safe_print(f"[ERROR] Main file not found: {main_file}")
         return None
 
     # Clean previous builds
@@ -302,7 +311,7 @@ def build_executable():
     # Add tools.json if it exists
     if TOOLS_JSON_PATH.exists():
         cmd.extend(["--add-data", f"{TOOLS_JSON_PATH}:mistmcp"])
-        print("📄 Including tools.json in build")
+        safe_print("Including tools.json in build")
 
     # Add all hidden imports
     for module in platform_config["hidden_imports"]:
@@ -316,8 +325,8 @@ def build_executable():
     # Add main file
     cmd.append(str(main_file))
 
-    print(f"🚀 Running PyInstaller for {platform.system()} {platform.machine()}...")
-    print(f"📋 Command: {' '.join(cmd[:8])}... (truncated)")
+    safe_print(f"Running PyInstaller for {platform.system()} {platform.machine()}...")
+    safe_print(f"Command: {' '.join(cmd[:8])}... (truncated)")
 
     try:
         # Change to project root for build
@@ -337,32 +346,32 @@ def build_executable():
 
         if exe_path.exists():
             size_mb = exe_path.stat().st_size / (1024 * 1024)
-            print("✅ Build successful!")
-            print(f"📦 Executable: {exe_path}")
-            print(f"💾 Size: {size_mb:.1f} MB")
+            safe_print("[OK] Build successful!")
+            safe_print(f"Executable: {exe_path}")
+            safe_print(f"Size: {size_mb:.1f} MB")
 
             # Test the executable
-            print("🧪 Testing executable...", str(exe_path))
+            safe_print("Testing executable...")
             if test_executable(exe_path):
-                print("✅ Executable test passed")
+                safe_print("[OK] Executable test passed")
             else:
-                print("⚠️ Executable test failed but file exists")
+                safe_print("[WARNING] Executable test failed but file exists")
 
             return exe_path
         else:
-            print(f"❌ Executable not found at {exe_path}")
+            safe_print(f"[ERROR] Executable not found at {exe_path}")
             return None
 
     except subprocess.CalledProcessError as e:
-        print("❌ PyInstaller build failed!")
-        print(f"Exit code: {e.returncode}")
+        safe_print("[ERROR] PyInstaller build failed!")
+        safe_print(f"Exit code: {e.returncode}")
         if e.stdout:
-            print(f"stdout: {e.stdout[-500:]}")  # Last 500 chars
+            safe_print(f"stdout: {e.stdout[-500:]}")  # Last 500 chars
         if e.stderr:
-            print(f"stderr: {e.stderr[-500:]}")  # Last 500 chars
+            safe_print(f"stderr: {e.stderr[-500:]}")  # Last 500 chars
         return None
     except subprocess.TimeoutExpired:
-        print("❌ Build timed out after 10 minutes")
+        safe_print("[ERROR] Build timed out after 10 minutes")
         return None
     finally:
         os.chdir(original_cwd)
@@ -494,12 +503,12 @@ sudo apk add glibc libffi
     ) as f:
         f.write(content)
 
-    print(f"📄 Created platform-specific notes: PLATFORM-{system.upper()}.md")
+    safe_print(f"Created platform-specific notes: PLATFORM-{system.upper()}.md")
 
 
 def create_evaluation_package(exe_path):
     """Create evaluation package with documentation and examples"""
-    print("📦 Creating evaluation package...")
+    safe_print("Creating evaluation package...")
 
     package_dir = PROJECT_ROOT / "evaluation-package"
 
@@ -521,7 +530,7 @@ def create_evaluation_package(exe_path):
     build_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
     # Create comprehensive README
-    readme_content = f"""# 🚀 Mist MCP Evaluation Package
+    readme_content = f"""# *** Mist MCP Evaluation Package ***
 
 ## What This Is
 AI-powered assistant for managing Juniper Mist networks through Claude Desktop.
@@ -575,7 +584,7 @@ export MIST_HOST="api.mist.com"
 }}
 ```
 
-**⚠️ Critical:** Use the **absolute path** to the executable!
+**WARNING:** Use the **absolute path** to the executable!
 
 ### 4. Restart Claude Desktop and Test
 
@@ -583,35 +592,35 @@ Ask Claude: **"Show me my Mist organization information"**
 
 ## What You Can Ask Claude
 
-### 🏢 Organization & Sites
+### Organization & Sites
 - "Show me my organization details"
 - "List all my sites"
 - "What's the status of my sites?"
 
-### 📡 Device Management
+### Device Management
 - "What access points do I have?"
 - "Show me offline devices"
 - "List devices with issues"
 - "Find access points by site"
 
-### 👥 Client Monitoring
+### Client Monitoring
 - "Show me connected clients"
 - "Find clients with connection problems"
 - "What devices are having WiFi issues?"
 
-### 🚨 Network Health
+### Network Health
 - "What alarms are currently active?"
 - "Show me recent network events"
 - "Find high-utilization sites"
 - "Check network performance"
 
-### 📊 Statistics & Reports
+### Statistics & Reports
 - "Show me network usage statistics"
 - "What's my license usage?"
 - "Give me a network health summary"
 - "Show me top applications by usage"
 
-### 🔧 Troubleshooting
+### Troubleshooting
 - "Help me troubleshoot connectivity issues"
 - "Run network diagnostics"
 - "Show me device configuration issues"
@@ -648,27 +657,27 @@ Available categories include:
 
 ## Troubleshooting
 
-### ❌ "Command not found"
+### [ERROR] "Command not found"
 - Verify the absolute path to the executable is correct
 - On Mac/Linux: Make file executable with `chmod +x {exe_path.name}`
 
-### ❌ "API connection failed"
+### [ERROR] "API connection failed"
 - Check your `MIST_APITOKEN` is correct and has proper permissions
 - Verify `MIST_HOST` matches your region (api.mist.com, api.eu.mist.com, etc.)
 - Test API manually: `curl -H "Authorization: Token YOUR_TOKEN" https://YOUR_HOST/api/v1/self`
 
-### ❌ Claude doesn't see the server
+### [ERROR] Claude doesn't see the server
 - Restart Claude Desktop completely (quit and reopen)
 - Validate JSON syntax in `claude_desktop_config.json`
 - Check Claude Desktop logs for error messages
 - Ensure no trailing commas in JSON config
 
-### ❌ "Tool not available" errors
+### [ERROR] "Tool not available" errors
 - The system uses dynamic tool loading for performance
 - Ask Claude: "Enable the tools I need for device management"
 - Or use `--mode all` to load everything at startup
 
-### 🐛 Debug Mode
+### Debug Mode
 ```bash
 # Run with debug output
 export MISTMCP_DEBUG=true
@@ -736,30 +745,30 @@ This is an evaluation package. For questions or feedback:
         test_script_content = f"""@echo off
 REM Quick test script for the Mist MCP executable
 
-echo 🧪 Testing Mist MCP Executable
+echo [INFO] Testing Mist MCP Executable
 echo ==============================
 
 if "%MIST_APITOKEN%"=="" (
-    echo ❌ Please set MIST_APITOKEN environment variable
+    echo [ERROR] Please set MIST_APITOKEN environment variable
     echo    set MIST_APITOKEN=your-token-here
     exit /b 1
 )
 
 if "%MIST_HOST%"=="" (
-    echo ❌ Please set MIST_HOST environment variable
+    echo [ERROR] Please set MIST_HOST environment variable
     echo    set MIST_HOST=api.mist.com
     exit /b 1
 )
 
-echo ✅ Environment variables set
-echo 🚀 Testing executable...
+echo [OK] Environment variables set
+echo [INFO] Testing executable...
 
 timeout 10 {exe_path.name} --help
 if %errorlevel% equ 0 (
-    echo ✅ Executable test passed!
-    echo 📋 Now configure Claude Desktop with the provided config
+    echo [OK] Executable test passed!
+    echo [INFO] Now configure Claude Desktop with the provided config
 ) else (
-    echo ❌ Executable test failed
+    echo [ERROR] Executable test failed
     exit /b 1
 )
 """
@@ -768,30 +777,30 @@ if %errorlevel% equ 0 (
         test_script_content = f"""#!/bin/bash
 # Quick test script for the Mist MCP executable
 
-echo "🧪 Testing Mist MCP Executable"
+echo "[INFO] Testing Mist MCP Executable"
 echo "=============================="
 
 if [ -z "$MIST_APITOKEN" ]; then
-    echo "❌ Please set MIST_APITOKEN environment variable"
+    echo "[ERROR] Please set MIST_APITOKEN environment variable"
     echo "   export MIST_APITOKEN='your-token-here'"
     exit 1
 fi
 
 if [ -z "$MIST_HOST" ]; then
-    echo "❌ Please set MIST_HOST environment variable"
+    echo "[ERROR] Please set MIST_HOST environment variable"
     echo "   export MIST_HOST='api.mist.com'"
     exit 1
 fi
 
-echo "✅ Environment variables set"
-echo "🚀 Testing executable..."
+echo "[OK] Environment variables set"
+echo "[INFO] Testing executable..."
 
 timeout 10 ./{exe_path.name} --help
 if [ $? -eq 0 ]; then
-    echo "✅ Executable test passed!"
-    echo "📋 Now configure Claude Desktop with the provided config"
+    echo "[OK] Executable test passed!"
+    echo "[INFO] Now configure Claude Desktop with the provided config"
 else
-    echo "❌ Executable test failed"
+    echo "[ERROR] Executable test failed"
     exit 1
 fi
 """
@@ -806,20 +815,22 @@ fi
     # Create platform-specific notes
     create_platform_readme(package_dir, exe_path.name)
 
-    print(f"✅ Evaluation package created: {package_dir}")
-    print("📁 Package contents:")
-    print(f"   • {exe_path.name} - Standalone executable")
-    print("   • README.md - Complete setup guide")
-    print("   • claude_desktop_config.json - Example config")
-    print(f"   • {test_script_path.name} - Quick test script")
-    print(f"   • PLATFORM-{platform.system().upper()}.md - Platform-specific notes")
+    safe_print(f"[OK] Evaluation package created: {package_dir}")
+    safe_print("Package contents:")
+    safe_print(f"   * {exe_path.name} - Standalone executable")
+    safe_print("   * README.md - Complete setup guide")
+    safe_print("   * claude_desktop_config.json - Example config")
+    safe_print(f"   * {test_script_path.name} - Quick test script")
+    safe_print(
+        f"   * PLATFORM-{platform.system().upper()}.md - Platform-specific notes"
+    )
 
     return package_dir
 
 
 def cleanup_build_artifacts() -> None:
     """Clean up temporary build files"""
-    print("🧹 Cleaning up build artifacts...")
+    safe_print("Cleaning up build artifacts...")
 
     artifacts = [
         PROJECT_ROOT / "build",
@@ -833,7 +844,7 @@ def cleanup_build_artifacts() -> None:
                 shutil.rmtree(artifact)
             else:
                 artifact.unlink()
-            print(f"🗑️ Removed {artifact}")
+            safe_print(f"Removed {artifact}")
 
 
 def main() -> int:
@@ -865,24 +876,27 @@ def main() -> int:
         cleanup_build_artifacts()
 
         # Success message
-        print("\n🎉 BUILD SUCCESSFUL!")
-        print("=" * 50)
-        print(f"📦 Evaluation package: {package_dir}")
-        print("🎯 Share the entire folder with evaluators")
-        print("📖 They should start with README.md")
-        print()
-        print("Next steps for evaluators:")
-        print("1. Extract the package")
-        print("2. Follow README.md instructions")
-        print("3. Test with: 'Show me my organization info'")
+        safe_print("")
+        safe_print("*** BUILD SUCCESSFUL! ***")
+        safe_print("=" * 50)
+        safe_print(f"Evaluation package: {package_dir}")
+        safe_print("Share the entire folder with evaluators")
+        safe_print("They should start with README.md")
+        safe_print("")
+        safe_print("Next steps for evaluators:")
+        safe_print("1. Extract the package")
+        safe_print("2. Follow README.md instructions")
+        safe_print("3. Test with: 'Show me my organization info'")
 
         return 0
 
     except KeyboardInterrupt:
-        print("\n⚠️ Build interrupted by user")
+        safe_print("")
+        safe_print("[WARNING] Build interrupted by user")
         return 1
     except Exception as e:
-        print(f"\n❌ Unexpected error: {e}")
+        safe_print("")
+        safe_print(f"[ERROR] Unexpected error: {e}")
         import traceback
 
         traceback.print_exc()
