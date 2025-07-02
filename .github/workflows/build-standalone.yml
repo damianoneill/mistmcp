@@ -61,8 +61,28 @@ jobs:
         make init
 
     - name: Generate tools (if needed)
+      shell: bash
       run: |
-        make generate || echo "Generate step failed, continuing..."
+        # Run generation but don't fail if formatting has issues
+        if ! make generate; then
+          echo "Generate step failed, attempting to continue with code generation only..."
+          # Try just the generation without formatting
+          uv run python ./mcp_generator/generate_from_openapi.py || echo "Generation failed, continuing with existing files..."
+        fi
+
+    - name: Verify source files exist
+      shell: bash
+      run: |
+        # Check if essential source files exist
+        if [ ! -f "src/mistmcp/__main__.py" ]; then
+          echo "❌ Essential source files missing"
+          exit 1
+        fi
+        if [ ! -f "src/mistmcp/tool_helper.py" ]; then
+          echo "❌ Tool helper file missing"
+          exit 1
+        fi
+        echo "✅ Essential source files present"
 
     - name: Build standalone executable
       run: |
